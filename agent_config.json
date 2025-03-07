@@ -1,0 +1,32 @@
+{
+  "agent": "CodeActAgent",
+  "workspace": {
+    "path": "/workspace",
+    "enabled": true,
+    "access": true,
+    "mount_path": "/workspace"
+  },
+  "tools": {
+    "enabled": true,
+    "filesystem": true,
+    "bash": true,
+    "python": true,
+    "workspace_tools": true,
+    "llm_editor": true
+  },
+  "runtime": {
+    "workspace_path": "/workspace",
+    "container_workspace_path": "/workspace",
+    "extra_mounts": "/workspace:/workspace",
+    "environment": {
+      "WORKSPACE_PATH": "/workspace"
+    }
+  },
+  "model": {
+    "name": "${OLLAMA_MODEL}",
+    "host": "${OLLAMA_HOST}"
+  },
+  "security": {
+    "confirmation_mode": false
+  }
+} 

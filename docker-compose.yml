@@ -1,4 +1,3 @@
-
 services:
   openhands:
     build:
@@ -7,9 +6,39 @@ services:
     image: openhands:latest
     container_name: openhands-app-${DATE:-}
     environment:
+    #- SANDBOX_USER_ID=${SANDBOX_USER_ID:-1234} # enable this only if you want a specific non-root sandbox user but you will have to manually adjust permissions of openhands-state for this user
       - SANDBOX_RUNTIME_CONTAINER_IMAGE=${SANDBOX_RUNTIME_CONTAINER_IMAGE:-docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik}
-      #- SANDBOX_USER_ID=${SANDBOX_USER_ID:-1234} # enable this only if you want a specific non-root sandbox user but you will have to manually adjust permissions of openhands-state for this user
-      - WORKSPACE_MOUNT_PATH=${WORKSPACE_BASE:-$PWD/workspace}
+      - WORKSPACE_MOUNT_PATH=${WORKSPACE_BASE}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_MODEL_PARAMS={"temperature":0.2,"num_ctx":8192,"top_p":0.9,"seed":42}
+      - FILE_STORE=local
+      - FILE_STORE_PATH=/.openhands-state
+      - FILE_UPLOADS_MAX_FILE_SIZE_MB=100
+      - FILE_UPLOADS_RESTRICT_FILE_TYPES=false
+      - FILE_UPLOADS_ALLOWED_EXTENSIONS=.*
+      - CONVERSATIONS_ENABLED=true
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - OPENHANDS_FORCE_JSON_RESPONSE=true
+      - OPENHANDS_STRICT_JSON_PARSING=false
+      - SANDBOX_WORKSPACE_PATH=/workspace
+      - SANDBOX_RUNTIME_CONTAINER_WORKSPACE_PATH=/workspace
+      - SANDBOX_RUNTIME_CONTAINER_EXTRA_MOUNTS=${WORKSPACE_BASE}:/workspace
+      - DEFAULT_AGENT=CodeActAgent
+      - ENABLE_WORKSPACE_TOOLS=true
+      - ENABLE_FILESYSTEM_ACCESS=true
+      - AGENT_TOOLS_ENABLED=true
+      - AGENT_FILESYSTEM_ACCESS=true
+      - AGENT_WORKSPACE_PATH=/workspace
+      - AGENT_RUNTIME_WORKSPACE_PATH=/workspace
+      - AGENT_RUNTIME_CONTAINER_WORKSPACE_PATH=/workspace
+      - AGENT_RUNTIME_CONTAINER_EXTRA_MOUNTS=${WORKSPACE_BASE}:/workspace
+      - AGENT_RUNTIME_CONTAINER_EXTRA_ENV=WORKSPACE_PATH=/workspace
+      - AGENT_CONFIG_PATH=/agent_config.json
+      - LLM_SYSTEM_PROMPT="You are a helpful AI assistant with access to the filesystem. You can read files, write files, and execute commands. The workspace is mounted at /workspace. Always check the workspace first before responding."
+      - AGENT_PROMPT_PATH=/agent_prompt.md
     ports:
       - "3000:3000"
     extra_hosts:
@@ -17,7 +46,62 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ~/.openhands-state:/.openhands-state
-      - ${WORKSPACE_BASE:-$PWD/workspace}:/opt/workspace_base
+      - type: bind
+        source: ${WORKSPACE_BASE}
+        target: /opt/workspace_base
+      - type: bind
+        source: ${WORKSPACE_BASE}
+        target: /workspace
+      - type: bind
+        source: ./agent_config.json
+        target: /agent_config.json
+      - type: bind
+        source: ./agent_prompt.md
+        target: /agent_prompt.md
+      - type: bind
+        source: ./config.toml
+        target: /config.toml
+    networks:
+      - openhands-net
     pull_policy: build
     stdin_open: true
     tty: true
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    build:
+      context: ./
+      dockerfile: ./containers/ollama/Dockerfile
+    container_name: openhands-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - openhands-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:11434/api/generate", "-d", "{\"model\":\"${OLLAMA_MODEL}\",\"prompt\":\"test\",\"stream\":false}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+networks:
+  openhands-net:
+    name: openhands-net
+    driver: bridge
+
+volumes:
+  ollama_data:
+    name: openhands_ollama_data

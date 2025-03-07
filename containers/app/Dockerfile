@@ -89,10 +89,10 @@ RUN find /app \! -group app -exec chgrp app {} +
 
 COPY --chown=openhands:app --chmod=770 --from=frontend-builder /app/build ./frontend/build
 COPY --chown=openhands:app --chmod=770 ./containers/app/entrypoint.sh /app/entrypoint.sh
-
+RUN sed -i 's/\r$//' /app/entrypoint.sh
 USER root
 
 WORKDIR /app
 
-ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["uvicorn", "openhands.server.listen:app", "--host", "0.0.0.0", "--port", "3000"]
+#ENTRYPOINT ["/bin/bash", "-c", "/app/entrypoint.sh"]
+CMD ["/bin/bash", "/app/entrypoint.sh", "uvicorn", "openhands.server.listen:app", "--host", "0.0.0.0", "--port", "3000"]
