@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
 FROM dind AS openhands
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
 
 #
 RUN apt-get update && apt-get install -y \
@@ -61,32 +62,44 @@ RUN add-apt-repository ppa:deadsnakes/ppa \
     && apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip \
     && ln -s /usr/bin/python3.12 /usr/bin/python
 
-# NodeJS >= 18.17.1
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+# NodeJS >= 22.x
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs
+
+# Install Playwright dependencies
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    fonts-liberation \
+    libappindicator3-1 \
+    libxtst6 \
+    xvfb \
+    xauth \
+    libgconf-2-4 \
+    libxss1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && apt-get autoremove -y
 
 # Poetry >= 1.8
 RUN curl -fsSL https://install.python-poetry.org | python3.12 - \
-    && ln -s ~/.local/bin/poetry /usr/local/bin/poetry
+    && ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
-#
-RUN <<EOF
-#!/bin/bash
-printf "#!/bin/bash
-set +x
-uname -a
-docker --version
-gh --version | head -n 1
-git --version
-#
-python --version
-echo node `node --version`
-echo npm `npm --version`
-poetry --version
-netcat -h 2>&1 | head -n 1
-" > /version.sh
-chmod a+x /version.sh
-EOF
+# Create version.sh script
+RUN printf '#!/bin/bash\nset +x\nuname -a\ndocker --version\ngh --version | head -n 1\ngit --version\n#\npython --version\necho node $(node --version)\necho npm $(npm --version)\npoetry --version\nnetcat -h 2>&1 | head -n 1' > /version.sh && chmod a+x /version.sh
 
 ###
 FROM openhands AS dev
@@ -106,19 +119,30 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# cache build dependencies
-RUN \
-  --mount=type=bind,source=./,target=/app/ \
-  <<EOF
-#!/bin/bash
-make -s clean
-make -s check-dependencies
-make -s install-python-dependencies
+# Install global npm packages
+RUN npm install -g npm@latest
 
-# NOTE
-# node_modules are .dockerignore-d therefore not mountable
-# make -s install-frontend-dependencies
-EOF
+# Skip frontend dependencies during build
+RUN --mount=type=bind,source=./,target=/app/ \
+    bash -c 'cd /app && \
+    make -s clean && \
+    make -s check-dependencies && \
+    make -s install-python-dependencies'
 
-#
+# Add a script to install frontend dependencies at runtime
+RUN printf '#!/bin/bash\n\
+cd /app\n\
+# Ensure cache directories exist with proper permissions\n\
+mkdir -p /root/.cache && chmod -R 777 /root/.cache\n\
+mkdir -p /app/cache && chmod -R 777 /app/cache\n\
+# Install Playwright if not already installed\n\
+if [ ! -f /app/cache/playwright_installed ]; then\n\
+    poetry run playwright install --with-deps chromium\n\
+    touch /app/cache/playwright_installed\n\
+fi\n\
+# Install frontend dependencies\n\
+make -s install-frontend-dependencies\n\
+exec "$@"' > /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["bash"]
