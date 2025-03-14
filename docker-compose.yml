@@ -1,76 +1,28 @@
 services:
   openhands:
-    build:
-      context: ./
-      dockerfile: ./containers/app/Dockerfile
-    image: openhands:latest
-    container_name: openhands-app-${DATE:-}
+    image: docker.all-hands.dev/all-hands-ai/openhands:0.28
+    container_name: openhands-app
+    pull_policy: always
+    tty: true
+    stdin_open: true
     environment:
-    #- SANDBOX_USER_ID=${SANDBOX_USER_ID:-1234} # enable this only if you want a specific non-root sandbox user but you will have to manually adjust permissions of openhands-state for this user
-      - SANDBOX_RUNTIME_CONTAINER_IMAGE=${SANDBOX_RUNTIME_CONTAINER_IMAGE:-docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik}
-      - WORKSPACE_MOUNT_PATH=${WORKSPACE_BASE}
-      - OLLAMA_HOST=${OLLAMA_HOST}
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
-      - OLLAMA_MODEL_PARAMS={"temperature":0.2,"num_ctx":8192,"top_p":0.9,"seed":42}
-      - FILE_STORE=local
-      - FILE_STORE_PATH=/.openhands-state
-      - FILE_UPLOADS_MAX_FILE_SIZE_MB=100
-      - FILE_UPLOADS_RESTRICT_FILE_TYPES=false
-      - FILE_UPLOADS_ALLOWED_EXTENSIONS=.*
-      - CONVERSATIONS_ENABLED=true
-      - DEBUG=true
-      - LOG_LEVEL=debug
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - OPENHANDS_FORCE_JSON_RESPONSE=true
-      - OPENHANDS_STRICT_JSON_PARSING=false
-      - SANDBOX_WORKSPACE_PATH=/workspace
-      - SANDBOX_RUNTIME_CONTAINER_WORKSPACE_PATH=/workspace
-      - SANDBOX_RUNTIME_CONTAINER_EXTRA_MOUNTS=${WORKSPACE_BASE}:/workspace
-      - DEFAULT_AGENT=CodeActAgent
-      - ENABLE_WORKSPACE_TOOLS=true
-      - ENABLE_FILESYSTEM_ACCESS=true
-      - AGENT_TOOLS_ENABLED=true
-      - AGENT_FILESYSTEM_ACCESS=true
-      - AGENT_WORKSPACE_PATH=/workspace
-      - AGENT_RUNTIME_WORKSPACE_PATH=/workspace
-      - AGENT_RUNTIME_CONTAINER_WORKSPACE_PATH=/workspace
-      - AGENT_RUNTIME_CONTAINER_EXTRA_MOUNTS=${WORKSPACE_BASE}:/workspace
-      - AGENT_RUNTIME_CONTAINER_EXTRA_ENV=WORKSPACE_PATH=/workspace
-      - AGENT_CONFIG_PATH=/agent_config.json
-      - LLM_SYSTEM_PROMPT="You are a helpful AI assistant with access to the filesystem. You can read files, write files, and execute commands. The workspace is mounted at /workspace. Always check the workspace first before responding."
-      - AGENT_PROMPT_PATH=/agent_prompt.md
+      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik
+      - LOG_ALL_EVENTS=true
+      - SANDBOX_USER_ID=0
+      - WORKSPACE_BASE=/mnt/e/htdocs/Nyx-OpenHands
+      - WORKSPACE_MOUNT_PATH=/mnt/e/htdocs/Nyx-OpenHands
+      - WORKSPACE_MOUNT_PATH_IN_SANDBOX=/workspace
     ports:
       - "3000:3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.openhands-state:/.openhands-state
-      - type: bind
-        source: ${WORKSPACE_BASE}
-        target: /opt/workspace_base
-      - type: bind
-        source: ${WORKSPACE_BASE}
-        target: /workspace
-      - type: bind
-        source: ./agent_config.json
-        target: /agent_config.json
-      - type: bind
-        source: ./agent_prompt.md
-        target: /agent_prompt.md
-      - type: bind
-        source: ./config.toml
-        target: /config.toml
+      - ~/.openhands-state:/.openhands-state:rw
+      - /mnt/e/htdocs/Nyx-OpenHands:/opt/workspace_base:rw
     networks:
       - openhands-net
-    pull_policy: build
-    stdin_open: true
-    tty: true
-    depends_on:
-      ollama:
-        condition: service_healthy
-    restart: unless-stopped
-
+    
   ollama:
     build:
       context: ./

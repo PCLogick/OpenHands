@@ -1,0 +1,33 @@
+{
+  "workspace": {
+    "ignore_patterns": [
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/.pytest_cache/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.venv/**",
+      "**/cache/**",
+      "**/.cache/**",
+      "**/tests/**",
+      "**/docs/**",
+      "**/evaluation/**"
+    ],
+    "max_files_per_directory": 50,
+    "max_file_size_kb": 500,
+    "focus_directories": [
+      "frontend/src",
+      "openhands",
+      "microagents"
+    ],
+    "focus_mode": "include_only",
+    "loading_strategy": {
+      "mode": "lazy",
+      "preload_enabled": false,
+      "load_on_request": true,
+      "cache_loaded_files": true,
+      "max_cached_files": 100
+    }
+  }
+}
