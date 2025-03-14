@@ -14,7 +14,7 @@ done
 echo "Ollama API is now available"
 
 # Use environment variable with fallback
-MODEL="${OLLAMA_MODEL:-qwen2.5-coder:7b}"
+MODEL="${OLLAMA_MODEL:-Qwen2.5-Coder-14B-Instruct}"
 echo "Using model: $MODEL"
 
 # Check if model exists in Ollama
